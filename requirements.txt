@@ -1,0 +1,6 @@
+aiohttp==3.12.15
+transformers==4.55.2
+torch==2.8.0
+tokenizers==0.21.1
+tqdm==4.67.1
+vllm==0.10.2
