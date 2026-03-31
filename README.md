@@ -1,21 +1,40 @@
-<table align="center">
+<div align="center">
+
+<table>
   <tr>
-    <td>
-      <img src="figs/logo.png" alt="TESSY Logo" width="120"/>
+    <td align="center" width="140">
+      <img src="figs/logo.png" alt="TESSY Logo" width="110"/>
     </td>
     <td align="left">
-      <h1 style="margin: 0;">TESSY: Teacher–Student Cooperative Synthesis Framework</h1>
-      <p style="margin: 0;"><em>On-policy Data Synthesis for Reasoning Models</em></p>
+      <h1 style="margin-bottom: 6px;">
+        TESSY
+      </h1>
+      <h3 style="margin-top: 0; font-weight: normal;">
+        Teacher–Student Cooperative Synthesis Framework
+      </h3>
+      <p style="margin-top: 6px;">
+        <em>On-policy Data Synthesis for Reasoning Models</em>
+      </p>
     </td>
   </tr>
 </table>
----
 
-<p align="center">
-  📄 Paper: Coming Soon &nbsp;|&nbsp;
-  🤗 Dataset: <a href="https://huggingface.co/datasets/CoopReason/TESSY-Code-80K">TESSY-Code-80K</a>
-</p>
+<br/>
 
+📄 <b>Paper</b>:  
+<a href="https://github.com/CoopReason/TESSY/blob/main/paper/TESSY.pdf">
+How to Fine-Tune a Reasoning Model?<br/>
+A Teacher–Student Cooperation Framework to Synthesize Student-Consistent SFT Data
+</a>
+
+<br/>
+
+🤗 <b>Dataset</b>: 
+<a href="https://huggingface.co/datasets/CoopReason/TESSY-Code-80K">
+TESSY-Code-80K
+</a>
+
+</div>
 ---
 
 ## 🚀 Overview
@@ -140,3 +159,4 @@ Feel free to reach out!
 📌 Citation
 
 Coming Soon
+
