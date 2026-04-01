@@ -13,7 +13,7 @@
 
 <p align="center" style="margin-top: 15px; margin-bottom: 30px;">
   <!-- Company Logo (Rectangular) - Now below project title, centered -->
-  <img src="figs/logo_internlm.png" alt="Shailab InternLM Logo" width="180"/>
+  <img src="figs/logo_internlm.png" alt="Shailab InternLM Logo" width="280"/>
 </p>
 
 <p align="center">
