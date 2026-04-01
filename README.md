@@ -69,7 +69,7 @@ TESSY performs **iterative cooperative generation** through the following steps:
 
 Our experimental results demonstrate the effectiveness of TESSY:
 
--   Direct SFT (Supervised Fine-Tuning) using **GPT-OSS-120B data** (Teacher-Only approach) consistently leads to **❌ severe catastrophic forgetting**, significantly degrading performance on target tasks.
+-   Direct SFT using **GPT-OSS-120B data** (Teacher-Only approach) consistently leads to **❌ severe catastrophic forgetting**, significantly degrading performance on target tasks.
 -   Data synthesized using **TESSY** achieves **✅ significant improvement** on code generation benchmarks, effectively mitigating catastrophic forgetting and boosting student model performance.
 
 ---
