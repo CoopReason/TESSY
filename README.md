@@ -29,7 +29,7 @@
 
 Training reasoning models (e.g., Qwen3) is highly sensitive to the data distribution. We observe that:
 
-> ❗ Using off-policy data (e.g., directly from a strong teacher model) for SFT can lead to **severe catastrophic forgetting**, especially for code generation tasks.
+> ❗ Using off-policy data (e.g., directly from a strong teacher model) for SFT can lead to **severe catastrophic forgetting**, especially for complex reasoning tasks.
 
 ---
 
