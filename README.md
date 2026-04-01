@@ -6,7 +6,7 @@
     </td>
     <td align="left">
       <h1 style="margin: 0;">How to Fine-Tune a Reasoning Model?<br>A Teacher–Student Cooperation Framework to Synthesize Student-Consistent SFT Data</h1>
-      <p style="margin: 0; font-size: 1.1em;"><em>On-policy Data Synthesis for Reasoning Models</em></p>
+      <p style="margin: 0; font-size: 1.1em;"><em>On-policy SFT Data Synthesis for Reasoning Models</em></p>
     </td>
   </tr>
 </table>
