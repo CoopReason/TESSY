@@ -37,8 +37,8 @@ Training reasoning models (e.g., Qwen3) is highly sensitive to the data distribu
 
 To address this critical issue, we propose **TESSY**, a novel **Teacher–Student Cooperative Data Synthesis framework** designed to generate *on-policy* training data. Instead of relying on a teacher model to fully generate training samples, TESSY **decouples the generation process into two distinct parts**:
 
-- 🧠 **Teacher model** → specializes in generating *reasoning trajectories*.
-- ✍️ **Student model** → focuses on generating *non-reasoning content* (e.g., final outputs, transitions between reasoning steps).
+- 🧠 **Teacher model** → specializes in generating  *reason tokens*.
+- ✍️ **Student model** → focuses on generating *style tokens* (e.g., Hmm, Wait...).
 
 This cooperative approach ensures:
 
@@ -56,10 +56,8 @@ This cooperative approach ensures:
 TESSY performs **iterative cooperative generation** through the following steps:
 
 1.  **Predict Reasoning Boundaries**: The process begins by identifying the boundaries between reasoning steps and non-reasoning content within a given problem.
-2.  **Alternate Generation**: The teacher and student models then alternate in generating parts of the solution:
-    *   **Teacher** generates complex *reasoning steps*.
-    *   **Student** generates *final outputs* or *transitions* between the teacher's reasoning steps, ensuring stylistic consistency.
-3.  **Construct Full Trajectories**: By combining these collaboratively generated segments, TESSY constructs complete, high-quality reasoning trajectories that are aligned with the student model's capabilities.
+2.  **Alternate Generation**: The teacher and student models then alternate in generating parts of the solution.
+3.  **Construct Full Trajectories**: By combining these collaboratively generated segments, TESSY constructs complete, high-quality reasoning trajectories that are aligned with the student model's distribution.
 
 ---
 
@@ -80,7 +78,7 @@ Our experimental results demonstrate the effectiveness of TESSY:
 
 We are pleased to release the dataset used in our paper to facilitate further research:
 
--   **Name:** TESSY-Code-80K
+-   **Name:** [TESSY-Code-80K](https://huggingface.co/datasets/CoopReason/TESSY-Code-80K)
 -   **Designed for:** Optimally tailored for Qwen3-8B.
 -   **Effect:** TESSY demonstrates significant improvements across various code generation tasks for Qwen3-8B. Performance metrics are summarized below:
 
@@ -106,7 +104,7 @@ First, you need to start the API servers for both your teacher and student model
 
 ### 2. Prepare Boundary Predictors
 
-We provide pre-trained boundary predictors for your convenience:
+We provide trained boundary predictors for your convenience:
 
 -   `CoopReason/Boundary_Predictor_Teacher_Code`
 -   `CoopReason/Boundary_Predictor_Student_Code`
