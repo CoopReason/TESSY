@@ -5,7 +5,7 @@
       <img src="figs/logo.png" alt="TESSY Logo" width="120" style="border-radius: 10px;"/>
     </td>
     <td align="left">
-      <h1 style="margin: 0;">TESSY: Teacher–Student Cooperative Synthesis Framework</h1>
+      <h1 style="margin: 0;">TESSY: Teacher–Student Cooperative Data Synthesis Framework</h1>
       <p style="margin: 0; font-size: 1.1em;"><em>On-policy Data Synthesis for Reasoning Models</em></p>
     </td>
   </tr>
