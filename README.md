@@ -5,7 +5,7 @@
       <img src="figs/logo.png" alt="TESSY Logo" width="120" style="border-radius: 10px;"/>
     </td>
     <td align="left">
-      <h1 style="margin: 0;">TESSY: Teacher–Student Cooperative Data Synthesis Framework</h1>
+      <h1 style="margin: 0;">How to Fine-Tune a Reasoning Model?<br>A Teacher–Student Cooperation Framework to Synthesize Student-Consistent SFT Data</h1>
       <p style="margin: 0; font-size: 1.1em;"><em>On-policy Data Synthesis for Reasoning Models</em></p>
     </td>
   </tr>
@@ -27,7 +27,7 @@
 
 ## 🚀 Overview
 
-Training reasoning models (e.g., Qwen3) is highly sensitive to the **data distribution**. We observe that:
+Training reasoning models (e.g., Qwen3) is highly sensitive to the data distribution. We observe that:
 
 > ❗ Using off-policy data (e.g., directly from a strong teacher model) for SFT can lead to **severe catastrophic forgetting**, especially for code generation tasks.
 
@@ -35,7 +35,7 @@ Training reasoning models (e.g., Qwen3) is highly sensitive to the **data distri
 
 ## 💡 Key Idea
 
-To address this critical issue, we propose **TESSY**, a novel **Teacher–Student Cooperative Synthesis framework** designed to generate *on-policy* training data. Instead of relying on a teacher model to fully generate training samples, TESSY **decouples the generation process into two distinct parts**:
+To address this critical issue, we propose **TESSY**, a novel **Teacher–Student Cooperative Data Synthesis framework** designed to generate *on-policy* training data. Instead of relying on a teacher model to fully generate training samples, TESSY **decouples the generation process into two distinct parts**:
 
 - 🧠 **Teacher model** → specializes in generating *reasoning trajectories*.
 - ✍️ **Student model** → focuses on generating *non-reasoning content* (e.g., final outputs, transitions between reasoning steps).
