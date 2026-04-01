@@ -1,40 +1,30 @@
 <table align="center">
   <tr>
-    <td align="center" style="padding-right: 20px;">
+    <td align="center" style="padding-right: 30px;">
       <!-- Project Logo (Square) -->
       <img src="figs/logo.png" alt="TESSY Logo" width="120" style="border-radius: 10px;"/>
     </td>
     <td align="left">
       <h1 style="margin: 0;">TESSY: Teacher–Student Cooperative Synthesis Framework</h1>
-      <p style="margin: 0;"><em>On-policy Data Synthesis for Reasoning Models</em></p>
+      <p style="margin: 0; font-size: 1.1em;"><em>On-policy Data Synthesis for Reasoning Models</em></p>
     </td>
   </tr>
 </table>
 
-<table align="center" style="margin-top: 20px;" border="0" cellpadding="0" cellspacing="0">
-  <tr>
-    <td rowspan="2" style="padding-right: 20px; vertical-align: middle;">
-      <!-- Company Logo (Rectangular) -->
-      <img src="figs/logo_internlm.png" alt="Shailab InternLM Logo" width="180"/>
-    </td>
-    <td style="vertical-align: middle; padding-bottom: 5px;">
-      📄 <a href="https://github.com/CoopReason/TESSY/blob/main/paper/TESSY.pdf">Paper Link</a>
-    </td>
-  </tr>
-  <tr>
-    <td style="vertical-align: middle; padding-top: 5px;">
-      🤗 <a href="https://huggingface.co/datasets/CoopReason/TESSY-Code-80K">Training for Code Generation</a>
-    </td>
-  </tr>
-</table>
+<p align="center" style="margin-top: 15px; margin-bottom: 30px;">
+  <!-- Company Logo (Rectangular) - Now below project title, centered -->
+  <img src="figs/logo_internlm.png" alt="Shailab InternLM Logo" width="180"/>
+</p>
+
+<p align="center">
+  📄 <a href="https://github.com/CoopReason/TESSY/blob/main/paper/TESSY.pdf">Paper Link</a>
+  &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+  🤗 <a href="https://huggingface.co/datasets/CoopReason/TESSY-Code-80K">Training Set for Code Generation</a>
+</p>
 
 ---
 
-## TESSY: Teacher–Student Cooperative Synthesis Framework
 
-This repository contains the official implementation for the paper "How to Fine-Tune a Reasoning Model? A Teacher–Student Cooperation Framework to Synthesize Student-Consistent SFT Data."
-
----
 ## 🚀 Overview
 
 Training reasoning models (e.g., Qwen3) is highly sensitive to the **data distribution**. We observe that:
@@ -92,13 +82,14 @@ We are pleased to release the dataset used in our paper to facilitate further re
 
 -   **Name:** TESSY-Code-80K
 -   **Designed for:** Optimally tailored for Qwen3-8B.
--   **Effect:** Demonstrates significant improvements on code generation tasks:
-    *   LCB-V5: 55.09% -> **62.87%**
-    *   LCB-V6: 49.58% -> **55.43%**
-    *   LCB-Pro: 25.35% -> **22.10%** (Note: A lower score is better for LCB-Pro)
-    *   OJBench: 18.75% -> **25.43%**
+-   **Effect:** TESSY demonstrates significant improvements across various code generation tasks for Qwen3-8B. Performance metrics are summarized below:
 
-🔗 [https://huggingface.co/datasets/CoopReason/TESSY-Code-80K](https://huggingface.co/datasets/CoopReason/TESSY-Code-80K)
+| Benchmark |       Qwen3-8B       | Training on [TESSY-Code-80K](https://huggingface.co/datasets/CoopReason/TESSY-Code-80K) | Improvement |
+| :-------- |:--------------------:|:---------------------------------------------------------------------------------------:|:-----------:|
+| LCB-V5    |        55.09%        |                                       **62.87%**                                        |   ↑ 7.78%   |
+| LCB-V6    |        49.58%        |                                       **55.43%**                                        |   ↑ 5.85%   |
+| LCB-Pro   |        25.35%        |                                       **36.69%**                                        |  ↑ 11.34%   |
+| OJBench   |        18.75%        |                                       **25.43%**                                        |   ↑ 6.68%   |
 
 > **Note:** While this dataset can be applied to other Qwen3 models, the performance gains may vary as the synthesis process was specifically tailored and optimized for Qwen3-8B.
 
