@@ -157,7 +157,7 @@ Feel free to reach out to us!
 
 ## 📌 Citation
 
-Due to unforeseen reasons, our paper has been on-hold on arXiv for an extended period, and we are actively working with arXiv to resolve this issue. Currently, we have uploaded the paper to GitHub. Until our paper is officially released on arXiv, please cite our work as follows when using our dataset:
+Due to unforeseen reasons, our paper has been on-hold on arXiv for an extended period, and we are actively contacting arXiv to resolve this issue. Currently, we have uploaded the paper to GitHub. Until our paper is officially released on arXiv, please cite our work as follows when using our dataset:
 
 ```bibtex
 @article{TESSY,
