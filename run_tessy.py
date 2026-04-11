@@ -25,12 +25,12 @@ logging.getLogger("vllm").setLevel(logging.WARNING)
 def build_prompt(tokenizer, prompt, enable_think, name) -> str:
     bos = tokenizer.bos_token or ""
     name = name.lower()
-    if "qwen" in name or 'ds' in name:
+    if "qwen" in name:
         if enable_think:
             return f"<|im_start|>user\n{prompt}<|im_end|><|im_start|>assistant\n<think>\n"
         else:
             return f"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n"
-    elif 'ds' in name:
+    elif 'ds' in name or 'deepseek' in name:
         if enable_think:
             return f'<｜begin▁of▁sentence｜><｜User｜>{prompt}<｜Assistant｜><think>'
         else:
@@ -517,7 +517,7 @@ async def async_main(args):
             if teacher_group_inputs:
                 generation_tasks.append(
                     generate_and_update_model_states_async(
-                        student_token_classifier_tokenizer,
+                        teacher_token_classifier_tokenizer,
                         teacher_token_classifier_model,
                         llm_tokenizer_student,
                         "teacher",
