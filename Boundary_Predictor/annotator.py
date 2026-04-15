@@ -31,13 +31,13 @@ def read_jsonl(path):
 
 def save_jsonl(data, filename):
     print('save data:', len(data))
-    os.makedirs(os.path.dirname(filename), exist_ok=True)  # 创建必要的文件夹
+    os.makedirs(os.path.dirname(filename), exist_ok=True)  # Create necessary folders
     with open(filename, "a", encoding="utf-8") as f:
         for sample in data:
             f.write(json.dumps(sample, ensure_ascii=False) + "\n")
 
 def append_jsonl(path: str, data: dict) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)  # 自动创建目录
+    os.makedirs(os.path.dirname(path), exist_ok=True)  # Automatically create directory
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(data, ensure_ascii=False) + "\n")
 
@@ -49,7 +49,7 @@ def load_processed_ids(path_save: str) -> set:
     return ids
 
 
-def construct_dataset(path):
+def construct_dataset(path, data_size):
     dataset = read_jsonl(path)
     chunks = []
     for sample in dataset:
@@ -74,16 +74,19 @@ def construct_dataset(path):
         thinks = think.split('\n')
         if '' in thinks:
             thinks.remove('')
-    
-    if len(chunks) > 80_000:
-        chunks = random.sample(chunks, 80_000)
+        
+        if len(chunks) > data_size:
+            continue
+
+    if len(chunks) > data_size:
+        chunks = random.sample(chunks, data_size)
     return chunks
 
 
 def build_prompt(think_text: str) -> str:
     """
-    构造 prompt：要求模型抽取出所有语气、转折、过渡等无实质推理内容的片段，
-    按原文顺序返回一个 JSON 数组，每个元素是原文逐字拷贝的字符串。
+    Construct prompt: Request the model to extract all transitional, tonal, and filler phrases without substantial reasoning content,
+    return a JSON array in original text order, with each element being a verbatim copy of the string.
     """
     return f"""You are a text analysis expert.
 
@@ -126,34 +129,34 @@ Rules:
 
 def parse_and_locate_spans(model_output: str, original_think: str) -> Optional[List[Dict]]:
     """
-    解析模型输出（应为 JSON list[str]），并找出每个 span 在原文中的 (start, end) 索引。
+    Parse model output (should be JSON list[str]) and find the (start, end) index of each span in the original text.
 
-    返回：
+    Returns:
         [
-            {"span": "<逐字拷贝的文本>", "start": <int>, "end": <int>},
+            {"span": "<verbatim copied text>", "start": <int>, "end": <int>},
             ...
         ]
-    若解析出错、类型不符或任何 span 无法在原文中精确匹配，则返回 None。
+    Returns None if parsing fails, type mismatch, or any span cannot be exactly matched in the original text.
     """
     try:
         spans = json.loads(model_output)
     except Exception:
         return None
 
-    # 必须是列表
+    # Must be a list
     if not isinstance(spans, list):
         return None
 
     results = []
-    search_start = 0  # 保证按原文顺序搜索
+    search_start = 0  # Ensure searching in original text order
     for span in spans:
         if not isinstance(span, str) or span == "":
-            return None  # 格式不对或空字符串，不合法
+            return None  # Invalid format or empty string, not valid
 
-        # 查找 span 在原文中出现的位置，从 search_start 开始找，避免重复匹配前面的
+        # Find position of span in original text, starting from search_start, avoid duplicate matching of previous parts
         pos = original_think.find(span, search_start)
         if pos == -1:
-            return None  # 没找到对应子串
+            return None  # Corresponding substring not found
         start = pos
         end = pos + len(span)
 
@@ -163,12 +166,10 @@ def parse_and_locate_spans(model_output: str, original_think: str) -> Optional[L
             "end": end
         })
 
-        # 更新起始搜索点，保证顺序
+        # Update starting search point to ensure order
         search_start = end
 
     return results
-
-
 
 def generate_response(args):
     path = args.input_path
@@ -178,8 +179,8 @@ def generate_response(args):
     tensor_parallel_size = args.tensor_parallel_size
     enable_thinking = args.enable_thinking
     print('path:', path)
-    dataset = construct_dataset(path)
-    model = LLM(model_name, gpu_memory_utilization=0.85, tensor_parallel_size=tensor_parallel_size,
+    dataset = construct_dataset(path, args.train_size)
+    model = LLM(model_name, gpu_memory_utilization=0.95, tensor_parallel_size=tensor_parallel_size,
                 enable_expert_parallel=False, max_model_len=32768)
     sampling_params = SamplingParams(max_tokens=32768, temperature=0.7, top_p=0.8, top_k=20, min_p=0)
     print('path_save:', path_save)
@@ -237,17 +238,17 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", type=str,
-                        default='../../OJBench/results/evaluation_datas/math/qwen3_8b/part_0.jsonl',
                         help="Path to the input JSONL file")
     parser.add_argument("--output_path", type=str,
-                        default="annotated/math/student/train_set.jsonl",
                         help="Path to save the output fold")
-    parser.add_argument("--block-size", type=int, default=200, help="Save every N samples to the output file")
+    parser.add_argument("--block-size", type=int, default=2000, help="Save every N samples to the output file")
     parser.add_argument("--model_name", type=str, default="Qwen/Qwen3-32B")
     parser.add_argument("--tensor_parallel_size", type=int, default=8)
     parser.add_argument("--enable_thinking",
                         default=False,
                         type=ast.literal_eval)
+    parser.add_argument("--train_size", type=int, default=10_000, help="Save every N samples to the output file")
     args = parser.parse_args()
+    random.seed(222)
     generate_response(args)
     
