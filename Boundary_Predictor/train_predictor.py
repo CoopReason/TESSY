@@ -24,8 +24,8 @@ class ReasoningDataset(Dataset):
         sample = self.samples[idx]
         text = sample["think_text"]
 
-        # pred_result 是一个列表，包含多个 {"start": int, "end": int} 字典
-        # 这里的 start 和 end 是字符级别的索引
+        # pred_result is a list containing multiple {"start": int, "end": int} dictionaries
+        # The start and end here are character-level indices
         pred_results = sample.get("pred_result", []) 
 
         enc = self.tokenizer(
@@ -41,52 +41,52 @@ class ReasoningDataset(Dataset):
         attention_mask = enc["attention_mask"]
         offsets = enc["offset_mapping"]
 
-        # 初始化标签序列，所有 token 默认为类别 0 (非目标)
-        # 标签的长度与 input_ids 相同
-        labels = [0] * len(input_ids) 
+        # Initialize label sequence, all tokens default to class 0 (non-target)
+        # The length of labels is the same as input_ids
+        labels = [0] * len(input_ids)
 
-        # 根据 pred_result 标记目标 token
+        # Mark target tokens based on pred_result
         for res in pred_results:
             char_start = res["start"]
-            char_end = res["end"] # pred_result 的 end 是独占的
+            char_end = res["end"] # The end in pred_result is exclusive
 
             for i, (token_char_start, token_char_end) in enumerate(offsets):
                 if token_char_start == 0 and token_char_end == 0: # special tokens
                     continue
-                # 如果 token 的字符范围与目标结果有重叠，则标记为类别 1
-                # 这里的逻辑可以根据实际需求调整，例如：
-                # 1. 只要 token 包含在目标范围内就标记
-                # 2. 只有 token 完全在目标范围内才标记
-                # 3. token 的起始位置在目标范围内就标记
-                
-                # 这里我们选择：如果token的起始位置在 pred_result 的范围内，或者pred_result的起始位置在token的范围内，就标记。
-                # 简单起见，如果token的起始位置在目标范围内，或者与目标范围重叠，我们就将其标记为1。
-                # 更精确的匹配通常是：如果 token 对应的字符范围 [token_char_start, token_char_end) 
-                # 与 [char_start, char_end) 有交集，就标记为1。
-                
-                # 假设只要token的起始位置在pred_result的范围内，就标记
+                # If the token's character range overlaps with the target result, mark it as class 1
+                # The logic here can be adjusted according to actual needs, for example:
+                # 1. Mark if the token is contained within the target range
+                # 2. Mark only if the token is completely within the target range
+                # 3. Mark if the token's starting position is within the target range
+
+                # Here we choose: if the token's starting position is within the pred_result range, or the pred_result's starting position is within the token's range, we mark it.
+                # For simplicity, if the token's starting position is within the target range, or overlaps with the target range, we mark it as 1.
+                # More precise matching is usually: if the token's corresponding character range [token_char_start, token_char_end)
+                # intersects with [char_start, char_end), then mark it as 1.
+
+                # Assume that as long as the token's starting position is within the pred_result range, mark it
                 if char_start <= token_char_start < char_end:
                     labels[i] = 1
-                # 也可以考虑 token 包含 pred_result 的情况
+                # Also consider the case where the token contains pred_result
                 elif token_char_start <= char_start < token_char_end:
                      labels[i] = 1
-                
-        # 标签向左移动一个位置：
-        # 原始 labels:    [L1, L2, L3, L4, L5]
-        # 移动后 labels:  [L2, L3, L4, L5, -100] (最后一个 token 无标签，-100 是 PyTorch CrossEntropyLoss 的忽略索引)
-        # 注意：CLS, SEP 等特殊 token 的标签也需要相应调整
+
+        # Shift labels left by one position:
+        # Original labels:    [L1, L2, L3, L4, L5]
+        # Shifted labels:     [L2, L3, L4, L5, -100] (The last token has no label, -100 is the ignore index for PyTorch CrossEntropyLoss)
+        # Note: Labels for special tokens like CLS, SEP also need corresponding adjustment
         shifted_labels = labels[1:] + [-100] # -100 is ignored by CrossEntropyLoss
-        
-        # 确保 shifted_labels 长度与 input_ids 相同
+
+        # Ensure shifted_labels length matches input_ids
         assert len(shifted_labels) == len(input_ids), "Shifted labels length mismatch with input_ids"
 
         return {
             "input_ids": torch.tensor(input_ids, dtype=torch.long),
             "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
-            "labels": torch.tensor(shifted_labels, dtype=torch.long), # 存储序列标签
-            "offset_mapping": torch.tensor(offsets, dtype=torch.long), 
+            "labels": torch.tensor(shifted_labels, dtype=torch.long), # Store sequence labels
+            "offset_mapping": torch.tensor(offsets, dtype=torch.long),
             "text": text,
-            "original_pred_results": pred_results # 存储原始 pred_results 用于评估或预测后重建
+            "original_pred_results": pred_results # Store original pred_results for evaluation or post-prediction reconstruction
         }
 
 
@@ -124,43 +124,43 @@ def predict_dataset(model, tokenizer, dataloader, device, output_file=None):
 
         with torch.no_grad():
             logits = model(input_ids=input_ids, attention_mask=attention_mask).logits # [B, L, num_labels]
-            
-            # 获取每个 token 的预测类别 (0 或 1)
+
+            # Get the predicted class (0 or 1) for each token
             pred_labels = torch.argmax(logits, dim=-1) # [B, L]
 
         for i in range(input_ids.size(0)):
             text = texts[i]
-            # 获取当前样本的 offsets。注意：offsets 包含了特殊 token
+            # Get offsets for the current sample. Note: offsets include special tokens
             sample_offsets = offset_mapping[i][:len(input_ids[i])].cpu().tolist()
-            # 获取当前样本的预测标签序列
-            # predicted_label_sequence[j] 预测的是 input_ids[j+1] 的类别
+            # Get the predicted label sequence for the current sample
+            # predicted_label_sequence[j] predicts the class of input_ids[j+1]
             sample_pred_labels = pred_labels[i][:len(input_ids[i])].cpu().tolist()
-            
-            reconstructed_pred_results = []
-            current_span_start_char = -1 # 记录当前实体跨度的字符起始位置
-            last_token_end_char = -1 # 记录当前实体跨度中最后一个 token 的字符结束位置
 
-            # 遍历 input_ids，从第二个 token ([CLS] 后的第一个实际 token) 开始
-            # 因为 predicted_label_sequence[j] 对应的是 input_ids[j+1] 的标签
-            # 所以我们从 j=0 (预测 input_ids[1] 的标签) 开始，到倒数第二个 token (预测 input_ids[L-1] 的标签)
-            # 这样 j+1 不会超出 input_ids 的有效范围
-            
-            # 这里的循环是遍历标签序列，pred_labels[j] 是对 input_ids[j+1] 的预测
-            for j in range(len(sample_pred_labels) - 1): # 预测标签序列长度比 input_ids 少一个 (最后一个 token 没有标签)
-                # 获取当前预测所对应的 token 的信息 (input_ids[j+1])
-                token_idx_in_input_ids = j + 1 
-                
-                # 跳过特殊 token (如 [SEP] token，其 offsets 通常是 (0,0))
-                # 并且确保 token_idx_in_input_ids 在 sample_offsets 的有效范围内
+            reconstructed_pred_results = []
+            current_span_start_char = -1 # Record the character start position of the current entity span
+            last_token_end_char = -1 # Record the character end position of the last token in the current entity span
+
+            # Iterate through input_ids, starting from the second token (the first actual token after [CLS])
+            # Because predicted_label_sequence[j] corresponds to the label of input_ids[j+1]
+            # So we start from j=0 (predicting the label of input_ids[1]) to the second-to-last token (predicting the label of input_ids[L-1])
+            # This way j+1 will not exceed the valid range of input_ids
+
+            # This loop iterates through the label sequence, pred_labels[j] is the prediction for input_ids[j+1]
+            for j in range(len(sample_pred_labels) - 1): # The predicted label sequence is one shorter than input_ids (the last token has no label)
+                # Get the information of the token corresponding to the current prediction (input_ids[j+1])
+                token_idx_in_input_ids = j + 1
+
+                # Skip special tokens (e.g., [SEP] token, whose offsets are usually (0,0))
+                # And ensure token_idx_in_input_ids is within the valid range of sample_offsets
                 if token_idx_in_input_ids >= len(sample_offsets):
-                    break # 应该不会发生，但以防万一
-                
+                    break # Should not happen, but just in case
+
                 token_char_start, token_char_end = sample_offsets[token_idx_in_input_ids]
 
-                # 忽略特殊 token，它们的 offset 常常是 (0,0) 并且不在文本实际范围内
-                # 如果 token_char_start 和 token_char_end 都是 0，通常表示特殊 token
-                if token_char_start == 0 and token_char_end == 0 and token_idx_in_input_ids != 0: # 排除第一个token是CLS的情况
-                    # 如果当前有正在进行的 span，并且遇到了特殊 token，应该结束 span
+                # Ignore special tokens, their offsets are often (0,0) and are not in the actual text range
+                # If both token_char_start and token_char_end are 0, it usually indicates a special token
+                if token_char_start == 0 and token_char_end == 0 and token_idx_in_input_ids != 0: # Exclude the case where the first token is CLS
+                    # If there is an ongoing span and we encounter a special token, we should end the span
                     if current_span_start_char != -1:
                         if last_token_end_char != -1 and current_span_start_char < last_token_end_char:
                             reconstructed_pred_results.append({
@@ -170,19 +170,19 @@ def predict_dataset(model, tokenizer, dataloader, device, output_file=None):
                             })
                         current_span_start_char = -1
                         last_token_end_char = -1
-                    continue # 跳过特殊 token
-                
-                # 获取当前 token (input_ids[j+1]) 的预测标签
-                pred_label_for_current_token = sample_pred_labels[j] 
+                    continue # Skip special tokens
 
-                # 如果当前 token 被预测为类别 1
+                # Get the predicted label for the current token (input_ids[j+1])
+                pred_label_for_current_token = sample_pred_labels[j]
+
+                # If the current token is predicted as class 1
                 if pred_label_for_current_token == 1:
-                    if current_span_start_char == -1: # 新的 span 开始
+                    if current_span_start_char == -1: # New span starts
                         current_span_start_char = token_char_start
-                    last_token_end_char = token_char_end # 更新 span 的结束字符
+                    last_token_end_char = token_char_end # Update the end character of the span
 
-                else: # 如果当前 token 被预测为类别 0
-                    if current_span_start_char != -1: # 如果之前有正在进行的 span，则结束它
+                else: # If the current token is predicted as class 0
+                    if current_span_start_char != -1: # If there was an ongoing span, end it
                         if last_token_end_char != -1 and current_span_start_char < last_token_end_char:
                             reconstructed_pred_results.append({
                                 "text": text[current_span_start_char:last_token_end_char],
@@ -191,8 +191,8 @@ def predict_dataset(model, tokenizer, dataloader, device, output_file=None):
                             })
                         current_span_start_char = -1
                         last_token_end_char = -1
-            
-            # 循环结束后，处理可能还在进行的最后一个 span
+
+            # After the loop ends, handle the possibly ongoing last span
             if current_span_start_char != -1:
                 if last_token_end_char != -1 and current_span_start_char < last_token_end_char:
                     reconstructed_pred_results.append({
@@ -203,7 +203,7 @@ def predict_dataset(model, tokenizer, dataloader, device, output_file=None):
 
             results.append({
                 "text": text,
-                "predicted_label_sequence": sample_pred_labels, # 完整的预测标签序列
+                "predicted_label_sequence": sample_pred_labels, # Complete predicted label sequence
                 "reconstructed_pred_results": reconstructed_pred_results
             })
 
@@ -219,8 +219,9 @@ def predict_dataset(model, tokenizer, dataloader, device, output_file=None):
 def load_dataset(file_path, tokenizer, val_ratio=0.05, seed=42, sample_limit=None):
     with open(file_path, "r", encoding="utf-8") as f:
         data = [json.loads(line) for line in f]
-    if sample_limit is not None:
-        data = data[: sample_limit]
+    if sample_limit is not None and sample_limit < len(data):
+        data = random.sample(data, sample_limit)
+        # data = data[: sample_limit]
     random.seed(seed)
     random.shuffle(data)
 
@@ -248,10 +249,10 @@ def train_one_epoch(model, dataloader, optimizer, device, log_interval=10):
     for step, batch in enumerate(pbar):
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
-        labels = batch["labels"].to(device) # 序列标签
+        labels = batch["labels"].to(device) # Sequence labels
 
         outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-        loss = outputs.loss # AutoModelForTokenClassification 在传入 labels 时会自动计算损失
+        loss = outputs.loss # AutoModelForTokenClassification automatically computes loss when labels are passed
 
         optimizer.zero_grad()
         loss.backward()
@@ -285,16 +286,16 @@ def evaluate(model, dataloader, device):
 
             total_loss += loss.item()
 
-            # 计算准确率 (只考虑非 -100 的标签)
+            # Calculate accuracy (only consider labels that are not -100)
             active_logits = logits.view(-1, model.config.num_labels) # [B*L, num_labels]
             active_labels = labels.view(-1) # [B*L]
 
-            # 筛选出非 -100 的有效标签
+            # Filter out valid labels that are not -100
             mask = active_labels != -100
             active_logits = active_logits[mask]
             active_labels = active_labels[mask]
 
-            if active_labels.numel() > 0: # 确保有有效标签进行计算
+            if active_labels.numel() > 0: # Ensure there are valid labels for calculation
                 predicted_labels = torch.argmax(active_logits, dim=-1)
                 correct_predictions += (predicted_labels == active_labels).sum().item()
                 total_tokens += active_labels.numel()
@@ -303,21 +304,23 @@ def evaluate(model, dataloader, device):
     accuracy = correct_predictions / total_tokens if total_tokens > 0 else 0.0
     return avg_loss, accuracy
 
+
+# CUDA_VISIBLE_DEVICES=0 python train_predictor.py
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", type=str, default='annotated/math/student/train_set.jsonl')
+    parser.add_argument("--data_path", type=str, default='annotated/math/teacher_oss/train_set.jsonl')
     parser.add_argument("--model_path", type=str, default="../../hf_hub/Qwen3-0.6B-Base/")
-    parser.add_argument("--output_dir", type=str, default="checkpoints/math/student/")
+    parser.add_argument("--output_dir", type=str, default="checkpoints/math/teacher_oss/")
 
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-5)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--val_ratio", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--sample_limit", type=int, default=100_000)
-    parser.add_argument("--predict_only", action="store_true", help="只进行预测，不训练")
+    parser.add_argument("--sample_limit", type=int, default=10_000)
+    parser.add_argument("--predict_only", action="store_true", help="Only predict, do not train")
     parser.add_argument("--pred_output_file", type=str, default="tmp/val_predictions_seq_tag.jsonl",
-                        help="预测结果保存路径")
+                        help="Path to save prediction results")
     args = parser.parse_args()
 
 
@@ -327,33 +330,33 @@ def main():
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
-    # 加载数据
+    # Load data
     train_dataset, val_dataset = load_dataset(args.data_path, tokenizer,
                                               val_ratio=args.val_ratio,
                                               seed=args.seed,
                                               sample_limit=args.sample_limit)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn)
-    # num_labels 应该是 2，表示类别 0 和类别 1
-    num_labels = 2 
+    # num_labels should be 2, representing class 0 and class 1
+    num_labels = 2
 
     if args.predict_only:
-        # 只预测模式，加载保存的模型
+        # Prediction-only mode, load saved model
         print("⚡ Predict only mode: loading model from", args.output_dir)
         model = AutoModelForTokenClassification.from_pretrained(args.output_dir)
-        # 确保模型的 num_labels 与训练时一致，如果模型保存时 num_labels 为 1，这里可能需要调整
-        # 但如果模型在训练时就是针对 num_labels=2 训练的，则无需修改
+        # Ensure the model's num_labels matches the training setup, if the model was saved with num_labels=1, adjustments may be needed
+        # But if the model was trained with num_labels=2, no modification is needed
         model.to(device)
-    
+
         Path(args.pred_output_file).parent.mkdir(parents=True, exist_ok=True)
-        # 批量预测验证集
+        # Batch predict validation set
         predict_dataset(model, tokenizer, val_loader, device, output_file=args.pred_output_file)
         print(f"✅ Prediction finished. Results saved to {args.pred_output_file}")
         return
 
-    # ===== 训练模式 =====
+    # ===== Training mode =====
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
-    
-    # 初始化模型时指定 num_labels
+
+    # Specify num_labels when initializing the model
     model = AutoModelForTokenClassification.from_pretrained(args.model_path, num_labels=num_labels)
     model.to(device)
 
@@ -379,6 +382,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-    
