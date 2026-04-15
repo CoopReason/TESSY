@@ -48,13 +48,13 @@ Reasoning: high
         else:
             return f"{user_message_formatted}<|start|>assistant<|channel|>analysis<|message|><|end|><|start|>assistant<|channel|>final<|message|>"
 
-async def call_vllm_api_async(session: aiohttp.ClientSession, api_url: str, model_name: str, prompt: str, max_tokens: int, temperature: float = 0.7, top_p: float = 0.8, top_k: int = 20, min_p: float = 0.0):
+async def call_vllm_api_async(session: aiohttp.ClientSession, api_url: str, model_name: str, prompt: str, max_tokens: int, temperature: float = 0.7, top_p: float = 0.8, top_k: int = 20, min_p: float = 0.0, max_retries: int = 3):
 # , stop_sequences: list = None):
     headers = {'Content-Type': 'application/json'}
     # print('model_name:', model_name)
     payload = {
         "model": model_name,
-        "prompt": prompt, # prompt 现在是完整的，包含了原始prompt和已生成内容
+        "prompt": prompt, # prompt is complete now, including original prompt and generated content
         "max_tokens": max_tokens,
         "temperature": temperature,
         "top_p": top_p,
@@ -66,32 +66,53 @@ async def call_vllm_api_async(session: aiohttp.ClientSession, api_url: str, mode
 
     # if stop_sequences:
     #     payload["stop"] = stop_sequences
-    try:
-        async with session.post(api_url, headers=headers, json=payload, timeout=600) as response:
-            response.raise_for_status()
-            api_res = await response.json()
-            generated_text = api_res['choices'][0]['text']
-            return {"text": generated_text}
-    except aiohttp.ClientError as e:
-        print(f"API 调用失败: {e}")
-        print(f"请求URL: {api_url}, Payload: {payload}")
-        return {"text": ""}
-    except asyncio.TimeoutError:
-        print(f"API 调用超时: {api_url}, Payload: {payload}")
-        return {"text": ""}
 
-def classify_next_token_decision(batch_cur_texts, batch_generated_texts, current_model_name, 
+    for attempt in range(max_retries):
+        try:
+            async with session.post(api_url, headers=headers, json=payload, timeout=600) as response:
+                response.raise_for_status()
+                api_res = await response.json()
+                generated_text = api_res['choices'][0]['text']
+
+                # If return is empty, also treat as failure
+                if not generated_text or len(generated_text.strip()) == 0:
+                    print(f"API returned empty (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)  # Exponential backoff: 2s, 4s
+                        continue
+                    else:
+                        return {"text": ""}
+
+                return {"text": generated_text}
+        except aiohttp.ClientError as e:
+            print(f"API call failed (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff: 2s, 4s
+            else:
+                print(f"Request URL: {api_url}, Payload: {payload}")
+                return {"text": ""}
+        except asyncio.TimeoutError:
+            print(f"API call timeout (attempt {attempt + 1}/{max_retries})")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff: 2s, 4s
+            else:
+                print(f"Request URL: {api_url}, Payload: {payload}")
+                return {"text": ""}
+
+    return {"text": ""}
+
+def classify_next_token_decision(batch_cur_texts, batch_generated_texts, current_model_name,
                                  classifier_tokenizer, classifier_model, max_length=512, classifier_batch_size=32):
     all_batch_decisions = []
-    truncated_generated_texts = [] 
+    truncated_generated_texts = []
     assert len(batch_cur_texts) == len(batch_generated_texts)
-    
+
     batch_texts_for_classifier_input = [c_text + g_text for c_text, g_text in zip(batch_cur_texts, batch_generated_texts)]
     original_generated_texts_map = {i: gen_text for i, gen_text in enumerate(batch_generated_texts)}
 
     for i_start in range(0, len(batch_texts_for_classifier_input), classifier_batch_size):
         sub_batch_texts_input = batch_texts_for_classifier_input[i_start:i_start + classifier_batch_size]
-        
+
         current_sub_batch_original_indices = list(range(i_start, i_start + len(sub_batch_texts_input)))
 
         encodings = classifier_tokenizer(
@@ -101,12 +122,12 @@ def classify_next_token_decision(batch_cur_texts, batch_generated_texts, current
             padding="longest",
             return_tensors="pt",
             padding_side="left",
-            return_offsets_mapping=True 
+            return_offsets_mapping=True
         )
-        
+
         input_ids = encodings["input_ids"].cuda()
         attention_mask = encodings["attention_mask"].cuda()
-        offset_mapping = encodings["offset_mapping"] 
+        offset_mapping = encodings["offset_mapping"]
 
         with torch.no_grad():
             if isinstance(classifier_model, nn.DataParallel):
@@ -115,10 +136,10 @@ def classify_next_token_decision(batch_cur_texts, batch_generated_texts, current
                 model_to_use = classifier_model
             model_to_use = model_to_use.to(input_ids.device).bfloat16().eval()
             logits = model_to_use(input_ids=input_ids, attention_mask=attention_mask)[0]
-            
+
             for i in range(input_ids.size(0)):
                 original_idx_in_full_batch = current_sub_batch_original_indices[i]
-                
+
                 cur_text = batch_cur_texts[original_idx_in_full_batch]
                 original_gen_text = original_generated_texts_map[original_idx_in_full_batch]
                 combined_text_original = batch_texts_for_classifier_input[original_idx_in_full_batch]
@@ -126,71 +147,71 @@ def classify_next_token_decision(batch_cur_texts, batch_generated_texts, current
                 actual_length = attention_mask[i].sum().item()
 
                 assert actual_length > 0
-                
+
                 start_token_idx_in_input_ids = input_ids.shape[1] - actual_length
                 valid_input_ids_for_sample = input_ids[i, start_token_idx_in_input_ids : start_token_idx_in_input_ids + actual_length]
 
-                
+
                 sample_logits = logits[i, start_token_idx_in_input_ids : start_token_idx_in_input_ids + actual_length, :]
-                pred_labels = torch.argmax(sample_logits, dim=-1).tolist() 
+                pred_labels = torch.argmax(sample_logits, dim=-1).tolist()
                 sample_offset_mapping = offset_mapping[i, start_token_idx_in_input_ids : start_token_idx_in_input_ids + actual_length].tolist()
-                
+
                 assert classifier_tokenizer.eos_token_id != valid_input_ids_for_sample[-1]
-                
+
                 assert len(original_gen_text) > 0
-                current_truncated_gen_text = original_gen_text # 默认不截断
-                truncation_char_end_idx = -1 
-                final_decision_for_sample = pred_labels[-1] if pred_labels else 0 
+                current_truncated_gen_text = original_gen_text # Default: no truncation
+                truncation_char_end_idx = -1
+                final_decision_for_sample = pred_labels[-1] if pred_labels else 0
 
                 generated_text_start_char_in_combined = len(cur_text)
-                
-                for token_idx_in_sequence in range(actual_length): 
+
+                for token_idx_in_sequence in range(actual_length):
                     label_for_token = pred_labels[token_idx_in_sequence]
                     start_char, end_char = sample_offset_mapping[token_idx_in_sequence]
                     is_part_of_generated_text = (start_char > generated_text_start_char_in_combined)
                     if not is_part_of_generated_text:
-                        continue 
+                        continue
                     assert end_char > generated_text_start_char_in_combined
-                    
+
                     if current_model_name == "teacher":
-                        if label_for_token == 1: 
+                        if label_for_token == 1:
                             truncation_char_end_idx = end_char
-                            final_decision_for_sample = 1 # 截断点处的决策
-                            break 
-                    elif current_model_name == "student":
-                        if label_for_token == 0: 
-                            truncation_char_end_idx = end_char
-                            final_decision_for_sample = 0 # 截断点处的决策
+                            final_decision_for_sample = 1 # Decision at truncation point
                             break
-                # 根据最终确定的 truncation_char_end_idx 和 original_gen_text 来截断
-                if truncation_char_end_idx != -1: 
-                    # 初步截断
+                    elif current_model_name == "student":
+                        if label_for_token == 0:
+                            truncation_char_end_idx = end_char
+                            final_decision_for_sample = 0 # Decision at truncation point
+                            break
+                # Truncate based on final truncation_char_end_idx and original_gen_text
+                if truncation_char_end_idx != -1:
+                    # Initial truncation
                     assert truncation_char_end_idx > generated_text_start_char_in_combined
                     temp_truncated_combined = combined_text_original[:truncation_char_end_idx]
                     current_truncated_gen_text = temp_truncated_combined[generated_text_start_char_in_combined:]
 
-                    # 后处理：扩展截断后的文本，避免单词被中间截断
-                    # 找到 current_truncated_gen_text 在 original_gen_text 中的结束位置
-                    # 也就是 combined_text_original 中的 truncation_char_end_idx
-                    
-                    # 检查 truncation_char_end_idx 是否在 combined_text_original 的有效范围内
+                    # Post-processing: extend truncated text to avoid splitting words in the middle
+                    # Find the end position of current_truncated_gen_text in original_gen_text
+                    # Which is truncation_char_end_idx in combined_text_original
+
+                    # Check if truncation_char_end_idx is within valid range of combined_text_original
                     if truncation_char_end_idx < len(combined_text_original):
-                        # 从当前截断点开始，向后遍历，直到遇到空格或字符串结束
+                        # From current truncation point, iterate forward until encountering space or end of string
                         current_check_idx = truncation_char_end_idx
                         while current_check_idx < len(combined_text_original) and not combined_text_original[current_check_idx].isspace():
-                            # 如果下一个字符不是空格，就添加到 current_truncated_gen_text 中
-                            # 这里需要注意，我们是从 combined_text_original 中获取字符
-                            # 但我们要添加到 current_truncated_gen_text，这是 original_gen_text 的一部分
-                            # 所以需要确保是从 original_gen_text 中对应的位置取字符
-                            
-                            # 确保 current_check_idx - generated_text_start_char_in_combined 
-                            # 在 original_gen_text 的有效索引范围内
+                            # If next character is not a space, add it to current_truncated_gen_text
+                            # Note: we get characters from combined_text_original
+                            # But we need to add to current_truncated_gen_text, which is part of original_gen_text
+                            # So we need to ensure we get characters from the corresponding position in original_gen_text
+
+                            # Ensure current_check_idx - generated_text_start_char_in_combined
+                            # is within valid index range of original_gen_text
                             if current_check_idx >= generated_text_start_char_in_combined:
-                                # 只添加生成文本部分的字符
+                                # Only add characters from the generated text part
                                 char_to_add_from_gen_text = original_gen_text[current_check_idx - generated_text_start_char_in_combined]
                                 current_truncated_gen_text += char_to_add_from_gen_text
                             current_check_idx += 1
-                    
+
                 assert len(current_truncated_gen_text) > 0
                 truncated_generated_texts.append(current_truncated_gen_text)
                 all_batch_decisions.append(final_decision_for_sample)
@@ -240,26 +261,26 @@ async def generate_and_update_model_states_async(
 
     vllm_results = await asyncio.gather(*tasks)
 
-    # --- 修复点 1: 创建一个结果查找表，避免 zip 错位 ---
+    # --- Fix 1: Create a result lookup table to avoid zip misalignment ---
     # key: original_idx, value: {text, decision}
     final_results_map = {}
-    
+
     classifier_cur_texts = []
     classifier_generated_texts = []
     classifier_map_to_original_indices = []
 
     for i_map_item, res in zip(inputs_map, vllm_results):
         original_idx = i_map_item['original_idx']
-        sample_entry = active_pool_batch[original_idx] # 正确获取当前样本
+        sample_entry = active_pool_batch[original_idx] # Correctly get current sample
         generated_text = res["text"]
 
         if len(generated_text) == 0:
             sample_entry["finished"] = True
             sample_entry["generation_error"] = True
-            print(f'API生成为空，标记错误: original_idx={original_idx}')
+            print(f'API returned empty, marking as error: original_idx={original_idx}')
             continue
-            
-        # 记录成功的生成结果
+
+        # Record successful generation result
         final_results_map[original_idx] = {"text": generated_text, "decision": None}
 
         if not teacher_full_generation_mode:
@@ -267,7 +288,7 @@ async def generate_and_update_model_states_async(
             classifier_generated_texts.append(generated_text)
             classifier_map_to_original_indices.append(original_idx)
 
-    # --- 修复点 2: 运行分类器并更新查找表 ---
+    # --- Fix 2: Run classifier and update lookup table ---
     if not teacher_full_generation_mode and classifier_cur_texts:
         decisions, truncated_texts = classify_next_token_decision(
             classifier_cur_texts,
@@ -282,19 +303,19 @@ async def generate_and_update_model_states_async(
             final_results_map[orig_idx]["text"] = truncated_texts[idx_in_batch]
             final_results_map[orig_idx]["decision"] = decisions[idx_in_batch]
 
-    # --- 修复点 3: 遍历 inputs_map，通过 original_idx 访问结果 ---
+    # --- Fix 3: Iterate through inputs_map, access results via original_idx ---
     for i_map_item in inputs_map:
         original_idx = i_map_item['original_idx']
         if original_idx not in final_results_map:
-            continue # 已经在上面处理过 error 的样本会被跳过
-        
+            continue # Skip samples already processed as errors
+
         res_data = final_results_map[original_idx]
         generated_text = res_data["text"]
         pred_label = res_data["decision"]
-        
+
         sample_entry = active_pool_batch[original_idx]
-        
-        # 更新文本和状态
+
+        # Update text and state
         sample_entry["cur_text"] += generated_text
         generated_token_ids = tokenizer_for_llm.encode(generated_text, add_special_tokens=False)
         sample_entry["n_tokens_total"] += len(generated_token_ids)
@@ -305,20 +326,20 @@ async def generate_and_update_model_states_async(
         else:
             sample_entry["n_tokens_teacher"] += len(generated_token_ids)
             sample_entry["teacher_text"].append(generated_text)
-        
+
         if teacher_full_generation_mode:
             sample_entry["finished"] = True
             sample_entry["total_generation_time_sec"] = time.time() - sample_entry["start_processing_time"]
             continue
-        
-        # 长度检查
+
+        # Length check
         if sample_entry["n_tokens_total"] + sample_entry['student_prompt_len'] >= max_new_tokens_per_sample:
             sample_entry["finished"] = True
             sample_entry["generation_error"] = True
-            print(f'样本 {original_idx} 超长')
+            print(f'Sample {original_idx} exceeds max length')
             continue
 
-        # 逻辑判断切换模型
+        # Logic to switch models
         current_think_end_tags = ['</think>', 'assistantfinal']
         think_end_found = False
         for tag in current_think_end_tags:
@@ -329,7 +350,7 @@ async def generate_and_update_model_states_async(
                 sample_entry["teacher_full_generation"] = True
                 think_end_found = True
                 break
-        
+
         if not think_end_found and pred_label is not None:
             if current_model_name == "teacher" and pred_label == 1:
                 sample_entry["current_model"] = "student"
@@ -338,7 +359,7 @@ async def generate_and_update_model_states_async(
 
 
 async def async_main(args):
-    # 分类器模型加载仍然在 main 中，然后传入
+    # Classifier model loading still in main, then passed in
     teacher_api_model_name = args.api_model_name_teacher
     student_api_model_name = args.api_model_name_student
     teacher_api_url = args.teacher_api_url
@@ -347,7 +368,7 @@ async def async_main(args):
     input_path = args.input_path
     output_path = args.output_path
     enable_think = args.enable_thinking
-    classifier_len = args.classifier_len # 使用局部变量
+    classifier_len = args.classifier_len # Use local variable
     max_new_tokens_per_sample = args.max_new_tokens
 
 
@@ -364,7 +385,7 @@ async def async_main(args):
     if llm_tokenizer_student.pad_token is None:
         llm_tokenizer_student.pad_token = llm_tokenizer_student.eos_token
 
-    # 加载教师分类器 tokenizer 和模型
+    # Load teacher classifier tokenizer and model
     teacher_token_classifier_tokenizer = AutoTokenizer.from_pretrained(args.teacher_classifier_path, trust_remote_code=True)
     teacher_token_classifier_tokenizer.truncation_side = "left"
     teacher_classifier_config = AutoConfig.from_pretrained(args.teacher_classifier_path, num_labels=2)
@@ -373,13 +394,13 @@ async def async_main(args):
     )
 
     print('====================')
-    print('加载教师分类器自:', args.teacher_classifier_path)
+    print('Loading teacher classifier from:', args.teacher_classifier_path)
     print('====================')
 
     teacher_classifier_model_base = teacher_classifier_model_base.bfloat16().cuda()
     teacher_token_classifier_model = nn.DataParallel(teacher_classifier_model_base).eval()
 
-    # 加载学生分类器 tokenizer 和模型
+    # Load student classifier tokenizer and model
     student_token_classifier_tokenizer = AutoTokenizer.from_pretrained(args.student_classifier_path, trust_remote_code=True)
     student_token_classifier_tokenizer.truncation_side = "left"
     student_classifier_config = AutoConfig.from_pretrained(args.student_classifier_path, num_labels=2)
@@ -388,25 +409,16 @@ async def async_main(args):
     )
     student_classifier_model_base = student_classifier_model_base.bfloat16().cuda()
     print('====================')
-    print('加载学生分类器自:', args.student_classifier_path)
+    print('Loading student classifier from:', args.student_classifier_path)
     print('====================')
     student_token_classifier_model = nn.DataParallel(student_classifier_model_base).eval()
 
 
-    if args.reversed:
-        dataset = [sample for sample in reversed(dataset)]
-    elif args.middle:
-        temp_dataset_for_middle = list(dataset) 
-        mid_idx = len(temp_dataset_for_middle) // 2
-        dataset = sorted(temp_dataset_for_middle, key=lambda x: abs(mid_idx - temp_dataset_for_middle.index(x)))
 
-    if args.debug:
-        dataset = dataset[:args.batch_size * 2]
-
-    dataset_queue = deque(dataset)  # 使用 deque 支持队列尾部追加
+    dataset_queue = deque(dataset)  # Use deque to support queue tail append
     active_pool_batch = []
     beg = time.time()
-    pbar = tqdm(total=len(dataset), desc="已处理")
+    pbar = tqdm(total=len(dataset), desc="Processed")
 
     step = 0
     step_time_avg = 0
@@ -416,7 +428,7 @@ async def async_main(args):
     async with aiohttp.ClientSession() as session:
         while True:
             step_time_start = time.time()
-            # 阶段 1: 填充 active_pool_batch 直到 batch_size
+            # Stage 1: Fill active_pool_batch up to batch_size
             while len(active_pool_batch) < args.batch_size and dataset_queue:
                 s = dataset_queue.popleft()
 
@@ -428,10 +440,10 @@ async def async_main(args):
                     continue
 
                 prompt_text_original = s["dialogs"][0]["content"] if "dialogs" in s else s["prompt"]
-                
+
                 if system_prompt is not None:
                     prompt_text_original = f'{system_prompt}\n\n{prompt_text_original}'
-                
+
                 initial_student_prompt_formatted = build_prompt(
                     llm_tokenizer_student, prompt_text_original, enable_think, student_api_model_name
                 )
@@ -440,14 +452,14 @@ async def async_main(args):
                 )
                 prompt_token_ids_student = llm_tokenizer_student.encode(initial_student_prompt_formatted, add_special_tokens=False)
                 prompt_token_ids_teacher = llm_tokenizer_teacher.encode(initial_teacher_prompt_formatted, add_special_tokens=False)
-                
+
                 max_initial_prompt_len = max(len(prompt_token_ids_student), len(prompt_token_ids_teacher))
                 if max_initial_prompt_len + 1 >= args.llm_max_model_len:
-                    print(f"跳过样本 {sample_id}，因为 prompt 过长 (长度 {max_initial_prompt_len})")
+                    print(f"Skipping sample {sample_id}, prompt too long (length {max_initial_prompt_len})")
                     pbar.update(1)
                     processed_ids.add(sample_id)
                     continue
-                
+
                 print('add sample:', sample_id)
                 active_pool_batch.append(copy.deepcopy({
                     "sample": s,
@@ -473,7 +485,7 @@ async def async_main(args):
             if not active_pool_batch:
                 break
 
-            # 阶段 2: 根据当前模型对样本进行分组并执行生成 (异步)
+            # Stage 2: Group samples by current model and execute generation (async)
             student_group_inputs = []
             teacher_group_inputs = []
             teacher_group_inputs_full_generation = []
@@ -557,12 +569,12 @@ async def async_main(args):
                         session=session
                     )
                 )
-                
+
             await asyncio.gather(*generation_tasks)
-            # 阶段 3: 处理已完成样本
+            # Stage 3: Process completed samples
             new_active_pool_batch = []
             for entry in active_pool_batch:
-                
+
                 if step % 100 == 0:
                     cur_text = entry['cur_text']
                     judge_len = 1000
@@ -571,20 +583,20 @@ async def async_main(args):
                     else:
                         findings = detect_consecutive_repetition_hash(cur_text)
                     if len(findings) > 0:
-                        print('生成重复失败')
+                        print('Generation failed due to repetition')
                         entry['generation_error'] = True
                         entry['finished'] = True
-                
+
                 if entry["finished"] and entry['generation_error'] is False:
                     # full_student_generated_text = " ".join(entry["student_text"])
                     # full_teacher_generated_text = " ".join(entry["teacher_text"])
-                    
+
                     full_student_generated_text = entry["student_text"]
                     out_text = post_process_text(entry["original_student_prompt"] + entry["cur_text"], enable_think)
 
                     # if 'gpt' in teacher_api_model_name.lower():
                     #     out_text = remove_triple_backticks(out_text)
-                    
+
                     s = entry["sample"]
 
                     if "dialogs" in s:
@@ -597,7 +609,7 @@ async def async_main(args):
                         if not found_assistant_response:
                             s["dialogs"].append({"role": "assistant", "content": out_text})
                     else:
-                        s["content"] = out_text 
+                        s["content"] = out_text
 
                     s["n_tokens_total"] = entry["n_tokens_total"]
                     s["n_tokens_teacher"] = entry["n_tokens_teacher"]
@@ -612,14 +624,14 @@ async def async_main(args):
                 elif entry['generation_error']:
                     entry['api_fail_time'] += 1
                     if entry['api_fail_time'] > args.max_retry_num:
-                        print(f"样本 {entry['id_ddm']} 生成失败，放弃")
+                        print(f"Sample {entry['id_ddm']} generation failed, giving up")
                     else:
                         dataset_queue.append(entry["sample"])
                         save_num_skip += 1
-                        print(f"样本 {entry['id_ddm']} 被暂时跳过，已重新加入队列末尾。")
+                        print(f"Sample {entry['id_ddm']} temporarily skipped, re-added to queue.")
                 else:
                     new_active_pool_batch.append(entry)
-            
+
             active_pool_batch = new_active_pool_batch
             step += 1
             step_time_end = time.time()
@@ -628,25 +640,22 @@ async def async_main(args):
             if len(new_active_pool_batch) > 0:
                 cur_max_token_num = max([item['n_tokens_total'] for item in new_active_pool_batch])
                 tmp = {item_i: (item['id_ddm'], item['n_tokens_total']) for item_i, item in enumerate(new_active_pool_batch)}
-                print(f"正在生成. 步骤: {step}. 学生样本: {len(student_group_inputs)}. 教师逐token样本: {len(teacher_group_inputs)}. 当前队列最大长度: {cur_max_token_num}. 保存样本: {save_num}. 跳过保存: {save_num_skip}. time all: {round(step_time_avg, 2)}s. time per step: {round(step_time_avg / step, 2)}")
+                print(f"Generating. Step: {step}. Student samples: {len(student_group_inputs)}. Teacher token-by-token samples: {len(teacher_group_inputs)}. Current max queue length: {cur_max_token_num}. Saved samples: {save_num}. Skipped saves: {save_num_skip}. Time all: {round(step_time_avg, 2)}s. Time per step: {round(step_time_avg / step, 2)}")
     pbar.close()
-    print("总耗时:", time.time() - beg)
+    print("Total time:", time.time() - beg)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", type=str, default="OJBench_testdata/prompts/python_middle_hard.jsonl")
     parser.add_argument("--output_path", type=str, default="results/ojbench/middle_hard/api_label_oss_multi.jsonl")
-    parser.add_argument("--max_new_tokens", type=int, default=38000, help="每个样本生成的最大总新 token 数。")
-    parser.add_argument("--model_name_student", type=str, 
+    parser.add_argument("--max_new_tokens", type=int, default=38000, help="Maximum total new tokens generated per sample.")
+    parser.add_argument("--model_name_student", type=str,
                         default='Qwen/Qwen3-8B',
-                        help="用于加载 student_token_classifier_tokenizer 的模型路径")
-    parser.add_argument("--api_model_name_student", type=str, default="Qwen/Qwen3-8B", help="学生模型在 VLLM API 中的名称。")
-    parser.add_argument("--batch_size", type=int, default=100, help="同时处理的样本数量。") 
+                        help="Model path for loading student_token_classifier_tokenizer")
+    parser.add_argument("--api_model_name_student", type=str, default="Qwen/Qwen3-8B", help="Student model name in VLLM API.")
+    parser.add_argument("--batch_size", type=int, default=100, help="Number of samples to process simultaneously.")
     parser.add_argument("--enable_thinking", default=True, type=ast.literal_eval)
-    parser.add_argument("--reversed", default=True, type=ast.literal_eval)
     parser.add_argument("--max_retry_num", default=5, type=int)
-    parser.add_argument("--middle", default=False, type=ast.literal_eval)
-    parser.add_argument("--debug", default=False, type=ast.literal_eval)
     parser.add_argument("--student_classifier_path", type=str,
                         default='checkpoints/teacher_label/32B_judge_8B_think/',
                         help="Path to student token classifier model")
@@ -657,18 +666,18 @@ if __name__ == "__main__":
     parser.add_argument("--student_step_size", type=int, default=5)
     parser.add_argument("--teacher_api_url", type=str, default="http://10.102.223.38:23333/v1/completions")
     parser.add_argument("--student_api_url", type=str, default="http://10.102.223.12:23333/v1/completions")
-    parser.add_argument("--api_model_name_teacher", type=str, 
-    default="Qwen/Qwen3-8B", 
-    help="教师模型在 VLLM API 中的名称。")
+    parser.add_argument("--api_model_name_teacher", type=str,
+    default="Qwen/Qwen3-8B",
+    help="Teacher model name in VLLM API.")
     parser.add_argument("--system_prompt", type=str,
                         default=None,
                         # default='Please reason step by step, and put your final answer within \\boxed{}.'
                         )
-    parser.add_argument("--model_name_teacher", type=str, 
+    parser.add_argument("--model_name_teacher", type=str,
     default="deepseek-ai/DeepSeek-R1-0528",
-    help="用于加载 teacher_token_classifier_tokenizer 和 main_llm_tokenizer 的模型路径")
-    parser.add_argument("--teacher_classifier_path", type=str, 
+    help="Model path for loading teacher_token_classifier_tokenizer and main_llm_tokenizer")
+    parser.add_argument("--teacher_classifier_path", type=str,
                         default='checkpoints/teacher_label/32B_judge_8B_think/')
     args = parser.parse_args()
-    asyncio.run(async_main(args)) # 运行异步主函数
+    asyncio.run(async_main(args)) # Run async main function
     
