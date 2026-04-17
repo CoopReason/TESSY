@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  📄 <a href="https://github.com/CoopReason/TESSY/blob/main/paper/TESSY.pdf">Paper Link</a>
+  📄 <a href="https://arxiv.org/pdf/2604.14164">Paper Link</a>
   &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
   🤗 <a href="https://huggingface.co/datasets/CoopReason/TESSY-Code-80K">Training Set for Code Generation</a>
 </p>
@@ -82,7 +82,7 @@ We are pleased to release the dataset used in our paper to facilitate further re
 -   **Designed for:** Optimally tailored for Qwen3-8B.
 -   **Effect:** TESSY demonstrates significant improvements across various code generation tasks for Qwen3-8B. Performance metrics are summarized below:
 
-| Benchmark |       Qwen3-8B       | Training on [TESSY-Code-80K](https://huggingface.co/datasets/CoopReason/TESSY-Code-80K) | Improvement |
+| Benchmark |       Qwen3-8B       | Training on TESSY-Code-80K | Improvement |
 | :-------- |:--------------------:|:---------------------------------------------------------------------------------------:|:-----------:|
 | LCB-V5    |        55.09%        |                                       **62.87%**                                        |   ↑ 7.78%   |
 | LCB-V6    |        49.58%        |                                       **55.43%**                                        |   ↑ 5.85%   |
@@ -157,15 +157,12 @@ Feel free to reach out to us!
 
 ## 📌 Citation
 
-Due to unforeseen reasons, our paper has been on-hold on arXiv for an extended period, and we are actively contacting arXiv to resolve this issue. Currently, we have uploaded the paper to GitHub. Until our paper is officially released on arXiv, please cite our work as follows when using our dataset:
-
+If this work is useful to you, please cite:
 ```bibtex
 @article{TESSY,
   title={How to Fine-Tune a Reasoning Model? A Teacher--Student Cooperation Framework to Synthesize Student-Consistent SFT Data},
-  author={Zixian Huang, Kaichen Yang, Xu Huang, Feiyang Hao, Qiming Ge, Bowen Li, He Du, Kai Chen and Qipeng Guo.}, 
-  year={2026},
-  howpublished={\url{https://github.com/CoopReason/TESSY/blob/main/paper/TESSY.pdf}},
-  note={Preprint. Available on GitHub.}
+  author={Huang, Zixian and Yang, Kaichen and Huang, Xu and Hao, Feiyang and Ge, Qiming and Li, Bowen and Du, He and Chen, Kai and Guo, Qipeng},
+  journal={arXiv preprint arXiv:2604.14164},
+  year={2026}
 }
 ```
-We kindly request that once our paper is published on arXiv, you update your citations to reference the official arXiv version. Thank you for your understanding and support!
