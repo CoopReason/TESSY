@@ -25,7 +25,7 @@
 ---
 
 
-## 🚀 Overview
+## 🚀 Motivation
 
 Training reasoning models (e.g., Qwen3) is highly sensitive to the data distribution. We observe that:
 
@@ -37,7 +37,7 @@ Training reasoning models (e.g., Qwen3) is highly sensitive to the data distribu
 
 To address this critical issue, we propose **TESSY**, a novel **Teacher–Student Cooperative Data Synthesis framework** designed to generate *on-policy* training data. Instead of relying on a teacher model to fully generate training samples, TESSY **decouples the generation process into two distinct parts**:
 
-- 🧠 **Teacher model** → specializes in generating  *reason tokens*.
+- 🧠 **Teacher model** → specializes in generating  *capability tokens*.
 - ✍️ **Student model** → focuses on generating *style tokens* (e.g., Hmm, Wait...).
 
 This cooperative approach ensures:
