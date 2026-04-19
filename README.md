@@ -130,30 +130,6 @@ bash run_tessy.sh \
 
 ---
 
-## ⚠️ Notes
-
-This repository currently represents a **research prototype (demo version)**. It is built on top of `vLLM` to leverage its efficient serving capabilities.
-
-Further improvements are actively being explored in areas such as:
-
--   Inference efficiency
--   Scheduling strategies
--   Batching optimization
-
----
-
-## 🤝 Contact & Future Work
-
-We are continuously working to improve TESSY and warmly welcome:
-
--   **Feedback:** Your insights are invaluable for enhancing the framework.
--   **Collaboration:** We are open to research collaborations.
--   **Real-world Deployment Discussions:** Interested in applying TESSY to practical scenarios? Let's talk!
-
-Feel free to reach out to us!
-**Email:** huangzixian@pjlab.org.cn
-
----
 
 ## 📌 Citation
 
