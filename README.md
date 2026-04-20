@@ -136,7 +136,7 @@ bash run_tessy.sh \
 If this work is useful to you, please cite:
 ```bibtex
 @article{TESSY,
-  title={How to Fine-Tune a Reasoning Model? A Teacher--Student Cooperation Framework to Synthesize Student-Consistent SFT Data},
+  title={How to Fine-Tune a Reasoning Model? A Teacher-Student Cooperation Framework to Synthesize Student-Consistent SFT Data},
   author={Huang, Zixian and Yang, Kaichen and Huang, Xu and Hao, Feiyang and Ge, Qiming and Li, Bowen and Du, He and Chen, Kai and Guo, Qipeng},
   journal={arXiv preprint arXiv:2604.14164},
   year={2026}
