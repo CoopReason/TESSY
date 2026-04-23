@@ -109,8 +109,8 @@ We provide trained boundary predictors for your convenience:
 -   `CoopReason/Boundary_Predictor_Teacher_Code`
 -   `CoopReason/Boundary_Predictor_Student_Code`
 
-Alternatively, you can train your own boundary predictors by running the script in:
-`bash Boundary_Predictor/`
+Alternatively, you can train your own boundary predictors by running the script in the folder
+[`Boundary_Predictor/`](https://github.com/CoopReason/TESSY/tree/main/Boundary_Predictor)
 
 ### 3. Run TESSY
 
