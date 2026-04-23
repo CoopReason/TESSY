@@ -97,10 +97,11 @@ We are pleased to release the dataset used in our paper to facilitate further re
 
 ### 1. Start Model Servers
 
-First, you need to start the API servers for both your teacher and student models. Record their API endpoints (IP address + port). Adjust the following parameters based on your hardware setup and resource availability:
+First, you need to start the API servers for both your teacher and student models (Configure and start the scripts `start_server_student.sh` and `start_server_teacher.sh`). Record their API endpoints (IP address + port). Adjust the following parameters based on your hardware setup and resource availability:
 
 -   `TP` (Tensor Parallelism)
 -   `GPU_MEM_UTILIZATION`
+  
 
 ### 2. Prepare Boundary Predictors
 
