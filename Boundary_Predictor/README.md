@@ -15,7 +15,7 @@ Sample data using both the teacher and student models.
 bash script_sample_data.sh
 ```
 
-### Step 2: Annotate Training Datas
+### Step 2: Annotate Training Data
 
 Using the data sampled in Step 1, we can automatically annotate style spans within them.
 
